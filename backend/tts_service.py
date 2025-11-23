@@ -1,38 +1,45 @@
-# backend/tts_service.py
-import os
+"""Text-to-speech via local XTTS-v2 (Coqui AI)."""
 from io import BytesIO
-from dotenv import load_dotenv
-from elevenlabs import VoiceSettings
-from elevenlabs.client import ElevenLabs
+import os
 
-load_dotenv()
+import soundfile as sf
+import torch
+from TTS.api import TTS
 
-# Initialize ElevenLabs client
-ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
-elevenlabs = ElevenLabs(api_key=ELEVENLABS_API_KEY)
 
-def speak_text(text: str, voice_id="pNInz6obpgDQGcFmaJgB"):
-    """
-    Convert text to speech using ElevenLabs streaming API.
-    Returns a BytesIO stream with audio data.
-    """
-    response = elevenlabs.text_to_speech.stream(
-        voice_id=voice_id,
-        output_format="mp3_22050_32",
+def _select_device() -> str:
+    if torch.backends.mps.is_available():
+        return "mps"
+    if torch.cuda.is_available():
+        return "cuda"
+    return "cpu"
+
+
+_MODEL_NAME = os.getenv("TTS_MODEL_NAME", "tts_models/multilingual/multi-dataset/xtts_v2")
+_DEVICE = _select_device()
+
+# XTTS supports multiple reference voices; default to a lightweight multilingual voice.
+_DEFAULT_SPEAKER = os.getenv("TTS_SPEAKER", "female-en-5")
+_DEFAULT_LANGUAGE = os.getenv("TTS_LANGUAGE", "en")
+
+_tts_model = TTS(model_name=_MODEL_NAME, progress_bar=False, gpu=False)
+if _DEVICE != "cpu":
+    _tts_model.to(_DEVICE)
+
+
+def speak_text(text: str, speaker_wav: str | None = None, speaker: str | None = None, language: str | None = None) -> BytesIO:
+    """Generate speech audio and return it as a WAV BytesIO buffer."""
+    selected_language = language or _DEFAULT_LANGUAGE
+    selected_speaker = speaker or _DEFAULT_SPEAKER
+
+    audio = _tts_model.tts(
         text=text,
-        model_id="eleven_multilingual_v2",
-        voice_settings=VoiceSettings(
-            stability=0.0,
-            similarity_boost=1.0,
-            style=0.0,
-            use_speaker_boost=True,
-            speed=1.0,
-        ),
+        speaker_wav=speaker_wav,
+        speaker=selected_speaker,
+        language=selected_language,
     )
 
-    audio_stream = BytesIO()
-    for chunk in response:
-        if chunk:
-            audio_stream.write(chunk)
-    audio_stream.seek(0)
-    return audio_stream
+    buffer = BytesIO()
+    sf.write(buffer, audio, samplerate=_tts_model.synthesizer.output_sample_rate, format="WAV")
+    buffer.seek(0)
+    return buffer

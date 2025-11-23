@@ -1,5 +1,4 @@
 import streamlit as st
-import tempfile
 from backend.ai_service import generate_topic_explanation
 from backend.stt_service import transcribe_audio
 from backend.tts_service import speak_text
@@ -23,5 +22,6 @@ if audio:
     explanation = generate_topic_explanation(topic)
     st.write(f"**Explanation:** {explanation}")
 
-    # Speak with ElevenLabs
-    speak_text(explanation, voice="Bella")
+    # Synthesize locally and play back
+    audio_stream = speak_text(explanation)
+    st.audio(audio_stream, format="audio/wav")
