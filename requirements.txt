@@ -6,3 +6,4 @@ sentencepiece
 whisper
 TTS
 soundfile
+python-dotenv

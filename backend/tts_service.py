@@ -1,45 +1,56 @@
-"""Text-to-speech via local XTTS-v2 (Coqui AI)."""
+"""Text-to-speech via the Hugging Face Inference API."""
+
+from __future__ import annotations
+
 from io import BytesIO
 import os
 
-import soundfile as sf
-import torch
-from TTS.api import TTS
+from dotenv import load_dotenv
+from huggingface_hub import InferenceClient
 
 
-def _select_device() -> str:
-    if torch.backends.mps.is_available():
-        return "mps"
-    if torch.cuda.is_available():
-        return "cuda"
-    return "cpu"
+load_dotenv()
+
+_HF_TOKEN = os.getenv("HUGGINGFACE_HUB_TOKEN")
+if not _HF_TOKEN:
+    raise RuntimeError("Missing HUGGINGFACE_HUB_TOKEN in environment/.env file.")
+
+_MODEL_NAME = os.getenv("TTS_MODEL_NAME", "parler-tts/parler-tts-mini-v1")
+_DEFAULT_SPEAKER = os.getenv("TTS_SPEAKER")
+_DEFAULT_LANGUAGE = os.getenv("TTS_LANGUAGE")
+
+_client = InferenceClient(token=_HF_TOKEN)
 
 
-_MODEL_NAME = os.getenv("TTS_MODEL_NAME", "tts_models/multilingual/multi-dataset/xtts_v2")
-_DEVICE = _select_device()
+def _build_generation_kwargs(speaker: str | None, language: str | None) -> dict[str, str]:
+    """Translate generic speaker/language hints to the HF API kwargs."""
+    generation_kwargs: dict[str, str] = {}
+    if speaker:
+        generation_kwargs["voice"] = speaker
+    elif _DEFAULT_SPEAKER:
+        generation_kwargs["voice"] = _DEFAULT_SPEAKER
 
-# XTTS supports multiple reference voices; default to a lightweight multilingual voice.
-_DEFAULT_SPEAKER = os.getenv("TTS_SPEAKER", "female-en-5")
-_DEFAULT_LANGUAGE = os.getenv("TTS_LANGUAGE", "en")
+    if language:
+        generation_kwargs["language"] = language
+    elif _DEFAULT_LANGUAGE:
+        generation_kwargs["language"] = _DEFAULT_LANGUAGE
 
-_tts_model = TTS(model_name=_MODEL_NAME, progress_bar=False, gpu=False)
-if _DEVICE != "cpu":
-    _tts_model.to(_DEVICE)
+    return generation_kwargs
 
 
-def speak_text(text: str, speaker_wav: str | None = None, speaker: str | None = None, language: str | None = None) -> BytesIO:
-    """Generate speech audio and return it as a WAV BytesIO buffer."""
-    selected_language = language or _DEFAULT_LANGUAGE
-    selected_speaker = speaker or _DEFAULT_SPEAKER
+def speak_text(
+    text: str,
+    speaker_wav: str | None = None,
+    speaker: str | None = None,
+    language: str | None = None,
+) -> BytesIO:
+    """Generate speech audio using Hugging Face-hosted models."""
+    if speaker_wav:
+        raise NotImplementedError("Voice cloning via speaker_wav is not supported with the HF Inference API.")
 
-    audio = _tts_model.tts(
-        text=text,
-        speaker_wav=speaker_wav,
-        speaker=selected_speaker,
-        language=selected_language,
-    )
+    generation_kwargs = _build_generation_kwargs(speaker, language)
+    audio_bytes = _client.text_to_speech(text=text, model=_MODEL_NAME, **generation_kwargs)
 
-    buffer = BytesIO()
-    sf.write(buffer, audio, samplerate=_tts_model.synthesizer.output_sample_rate, format="WAV")
+    buffer = BytesIO(audio_bytes)
     buffer.seek(0)
     return buffer
