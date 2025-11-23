@@ -1,8 +1,16 @@
 """Local LLM explanations using Llama 3.1 8B Instruct."""
 import os
 
+from dotenv import load_dotenv
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
+
+
+load_dotenv()
+
+_HF_TOKEN = os.getenv("HUGGINGFACE_HUB_TOKEN")
+if not _HF_TOKEN:
+    raise RuntimeError("Missing HUGGINGFACE_HUB_TOKEN in environment/.env file.")
 
 
 def _select_device() -> str:
@@ -14,12 +22,12 @@ def _select_device() -> str:
 
 
 _DEVICE = _select_device()
-_MODEL_NAME = os.getenv("LLM_MODEL_NAME", "meta-llama/Meta-Llama-3.1-8B-Instruct")
+_MODEL_NAME = os.getenv("LLM_MODEL_NAME", "TinyLlama/TinyLlama-1.1B-Chat-v1.0")
 _DTYPE = torch.float16 if _DEVICE != "cpu" else torch.float32
 
-_tokenizer = AutoTokenizer.from_pretrained(_MODEL_NAME)
+_tokenizer = AutoTokenizer.from_pretrained(_MODEL_NAME, token=_HF_TOKEN)
 _model = AutoModelForCausalLM.from_pretrained(
-    _MODEL_NAME, torch_dtype=_DTYPE, device_map="auto"
+    _MODEL_NAME, torch_dtype=_DTYPE, device_map="auto", token=_HF_TOKEN
 )
 _generation_pipeline = pipeline(
     "text-generation",

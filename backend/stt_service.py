@@ -1,8 +1,19 @@
 """Speech-to-text powered by local Whisper small model."""
 import os
 
+from dotenv import load_dotenv
 import torch
-import whisper
+
+try:
+    import openai_whisper as whisper
+except ImportError as exc:  # pragma: no cover - fail fast for missing dependency
+    raise ImportError(
+        "openai-whisper must be installed to run the speech-to-text service. "
+        "Install it with 'pip install openai-whisper'."
+    ) from exc
+
+
+load_dotenv()
 
 
 def _select_device() -> str:
