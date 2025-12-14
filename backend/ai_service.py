@@ -1,55 +1,51 @@
-"""Local LLM explanations using Llama 3.1 8B Instruct."""
+"""AI service powered by OpenAI GPT models."""
 import os
 
 from dotenv import load_dotenv
-import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
+from openai import OpenAI, OpenAIError
 
 
 load_dotenv()
 
-_HF_TOKEN = os.getenv("HUGGINGFACE_HUB_TOKEN")
-if not _HF_TOKEN:
-    raise RuntimeError("Missing HUGGINGFACE_HUB_TOKEN in environment/.env file.")
+_OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+if not _OPENAI_API_KEY:
+    raise RuntimeError("Missing OPENAI_API_KEY in environment/.env file.")
+
+_MODEL_NAME = os.getenv("OPENAI_MODEL", "gpt-5-nano")
+_client = OpenAI(api_key=_OPENAI_API_KEY)
 
 
-def _select_device() -> str:
-    if torch.backends.mps.is_available():
-        return "mps"
-    if torch.cuda.is_available():
-        return "cuda"
-    return "cpu"
+def _call_openai(prompt: str) -> str:
+    try:
+        response = _client.responses.create(
+            model=_MODEL_NAME,
+            input=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a friendly AI tutor who explains topics clearly "
+                        "and concisely for beginners."
+                    ),
+                },
+                {"role": "user", "content": prompt},
+            ],
+            max_output_tokens=220
+        )
+    except OpenAIError as exc:  # pragma: no cover - depends on API availability
+        raise RuntimeError(f"OpenAI API call failed: {exc}") from exc
 
-
-_DEVICE = _select_device()
-_MODEL_NAME = os.getenv("LLM_MODEL_NAME", "TinyLlama/TinyLlama-1.1B-Chat-v1.0")
-_DTYPE = torch.float16 if _DEVICE != "cpu" else torch.float32
-
-_tokenizer = AutoTokenizer.from_pretrained(_MODEL_NAME, token=_HF_TOKEN)
-_model = AutoModelForCausalLM.from_pretrained(
-    _MODEL_NAME, torch_dtype=_DTYPE, device_map="auto", token=_HF_TOKEN
-)
-_generation_pipeline = pipeline(
-    "text-generation",
-    model=_model,
-    tokenizer=_tokenizer,
-    device_map="auto",
-)
+    content = response.output[0].content[0].text if response.output else ""
+    if not content:
+        raise RuntimeError("OpenAI API returned an empty response.")
+    return content.strip()
 
 
 def generate_topic_explanation(topic: str) -> str:
     prompt = (
-        "You are a friendly AI tutor. Provide a concise, approachable "
-        f"explanation of the topic '{topic}' for a beginner. Keep it under 120 words."
+        f"Explain the topic '{topic}' in under 120 words using approachable language. "
+        "Focus on clarity and practical intuition."
     )
 
-    outputs = _generation_pipeline(
-        prompt,
-        max_new_tokens=180,
-        do_sample=True,
-        temperature=0.6,
-        top_p=0.9,
-        return_full_text=False,
-        eos_token_id=_tokenizer.eos_token_id,
-    )
-    return outputs[0]["generated_text"].strip()
+    response = _call_openai(prompt)
+
+    return response

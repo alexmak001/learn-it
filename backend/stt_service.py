@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 import torch
 
 try:
-    import openai_whisper as whisper
+    import whisper
 except ImportError as exc:  # pragma: no cover - fail fast for missing dependency
     raise ImportError(
         "openai-whisper must be installed to run the speech-to-text service. "
@@ -17,10 +17,12 @@ load_dotenv()
 
 
 def _select_device() -> str:
-    if torch.backends.mps.is_available():
-        return "mps"
     if torch.cuda.is_available():
         return "cuda"
+    # Metal backend tends to produce NaNs on Whisper due to half precision,
+    # so only opt into it when explicitly requested.
+    if torch.backends.mps.is_available() and os.getenv("WHISPER_ALLOW_MPS") == "1":
+        return "mps"
     return "cpu"
 
 
@@ -31,4 +33,9 @@ _model = whisper.load_model(_MODEL_NAME, device=_DEVICE)
 
 def transcribe_audio(audio_path: str) -> str:
     result = _model.transcribe(audio_path)
-    return result["text"].strip()
+
+    text = result["text"].strip()
+
+    print(f"Transcribed text: {text}")
+    
+    return text

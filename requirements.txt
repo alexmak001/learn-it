@@ -7,3 +7,4 @@ openai-whisper
 TTS
 soundfile
 python-dotenv
+openai
