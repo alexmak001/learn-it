@@ -2,7 +2,8 @@
 import json
 import logging
 import os
-from typing import Dict, List
+from typing import Dict, List, Optional
+import streamlit as st
 
 from dotenv import load_dotenv
 from openai import OpenAI, OpenAIError
@@ -13,7 +14,7 @@ _OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 if not _OPENAI_API_KEY:
     raise RuntimeError("Missing OPENAI_API_KEY in environment/.env file.")
 
-_MODEL_NAME = os.getenv("OPENAI_MODEL", "gpt-5-mini")
+_MODEL_NAME = os.getenv("OPENAI_MODEL", "gpt-5-nano-2025-08-07")
 _client = OpenAI(api_key=_OPENAI_API_KEY)
 _logger = logging.getLogger(__name__)
 
@@ -22,7 +23,9 @@ def _chat_completion(
     messages: List[Dict[str, str]],
     max_tokens: int = 500,
     response_format: Dict[str, str] | None = None,
+    logger: Optional[logging.Logger] = None,
 ) -> str:
+    active_logger = logger or _logger
     try:
         response = _client.chat.completions.create(
             model=_MODEL_NAME,
@@ -30,10 +33,11 @@ def _chat_completion(
             max_completion_tokens=max_tokens,
             response_format=response_format,
         )
+        # st.write(response)
     except OpenAIError as exc:  # pragma: no cover - depends on API availability
         raise RuntimeError(f"OpenAI API call failed: {exc}") from exc
 
-    _logger.debug(
+    active_logger.debug(
         "OpenAI response received (model=%s, format=%s, messages=%d): %s",
         _MODEL_NAME,
         response_format,
@@ -62,7 +66,8 @@ def generate_topic_explanation(topic: str) -> str:
             "role": "system",
             "content": (
                 "You are a friendly AI tutor who explains topics clearly "
-                "and concisely for beginners."
+                "and concisely for beginners. Answer immediately with the final "
+                "answer only—no step-by-step reasoning."
             ),
         },
         {"role": "user", "content": prompt},
@@ -75,14 +80,15 @@ def generate_topic_explanation(topic: str) -> str:
 
 def _dialogue_messages(topic: str) -> List[Dict[str, str]]:
     instructions = (
-        "You are orchestrating a duo teaching skit. "
-        "Produce EXACTLY three dialogue turns in JSON for DECAURIE, CARTOON_DAD, then DECAURIE. "
+        "You are orchestrating a duo teaching skit. Answer immediately with the final "
+        "lines—no step-by-step reasoning. "
+        "Produce EXACTLY three dialogue turns in JSON for JOHN, CARTOON_DAD, then JOHN. "
         "Total word count across lines should stay near 120 words. "
-        "DECAURIE speaks with clipped, city-tough energy and asks pointed questions. "
+        "JOHN speaks with clipped, city-tough energy and asks pointed questions. "
         "CARTOON_DAD delivers humorous yet accurate explanations and must include one concrete example. "
-        "The final DECAURIE line is a clarifying question or challenge. "
+        "The final JOHN line is a clarifying statement breadking down what CARTOON_DAD said. "
         "Respond ONLY with valid JSON shaped like "
-        '{"dialogue":[{"speaker":"DECAURIE","line":"..."}]}'
+        '{"dialogue":[{"speaker":"JOHN","line":"..."}]}'
     )
     user_prompt = (
         f"Topic: {topic}. Keep the dialogue approachable and helpful while honoring the persona rules."
@@ -103,7 +109,7 @@ def _parse_dialogue_payload(payload: str) -> List[Dict[str, str]]:
     if not isinstance(dialogue, list):
         raise ValueError("Dialogue payload missing 'dialogue' list.")
 
-    expected_order = ["DECAURIE", "CARTOON_DAD", "DECAURIE"]
+    expected_order = ["JOHN", "CARTOON_DAD", "JOHN"]
     if len(dialogue) != len(expected_order):
         raise ValueError("Dialogue must contain exactly three turns.")
 
@@ -121,9 +127,10 @@ def _parse_dialogue_payload(payload: str) -> List[Dict[str, str]]:
     return parsed
 
 
-def generate_dialogue(topic: str) -> List[Dict[str, str]]:
+def generate_dialogue(topic: str, logger: Optional[logging.Logger] = None) -> List[Dict[str, str]]:
     """Generate a structured three-turn dialogue for Duo Mode."""
-    _logger.info("Generating dialogue for topic: %s", topic)
+    active_logger = logger or _logger
+    active_logger.info("Generating dialogue for topic: %s", topic)
     base_messages = _dialogue_messages(topic)
     response_format = {"type": "json_object"}
     last_error: ValueError | None = None
@@ -136,22 +143,23 @@ def generate_dialogue(topic: str) -> List[Dict[str, str]]:
                     "role": "system",
                     "content": (
                         "Reminder: The reply MUST be valid JSON matching "
-                        '{"dialogue":[{"speaker":"DECAURIE","line":"..."}]}. '
+                        '{"dialogue":[{"speaker":"JOHN","line":"..."}]}. '
                         "Do not add commentary."
                     ),
                 }
             )
         raw = _chat_completion(
             messages,
-            max_tokens=1000,
+            max_tokens=10000,
             response_format=response_format,
+            logger=active_logger,
         )
         try:
             parsed = _parse_dialogue_payload(raw)
-            _logger.info("Dialogue generation succeeded on attempt %s", attempt + 1)
+            active_logger.info("Dialogue generation succeeded on attempt %s", attempt + 1)
             return parsed
         except ValueError as exc:
-            _logger.warning("Dialogue parse attempt %s failed: %s", attempt + 1, exc)
+            active_logger.warning("Dialogue parse attempt %s failed: %s", attempt + 1, exc)
             last_error = exc
             continue
 

@@ -1,5 +1,7 @@
 """Speech-to-text powered by local Whisper small model."""
+import logging
 import os
+from typing import Optional
 
 from dotenv import load_dotenv
 import torch
@@ -31,11 +33,13 @@ _DEVICE = _select_device()
 _model = whisper.load_model(_MODEL_NAME, device=_DEVICE)
 
 
-def transcribe_audio(audio_path: str) -> str:
-    result = _model.transcribe(audio_path)
+def transcribe_audio(audio_path: str, logger: Optional[logging.Logger] = None) -> str:
+    """Transcribe audio from disk and log the request lifecycle."""
+    active_logger = logger or logging.getLogger(__name__)
+    active_logger.info("Starting transcription for %s", audio_path)
 
+    result = _model.transcribe(audio_path)
     text = result["text"].strip()
 
-    print(f"Transcribed text: {text}")
-    
+    active_logger.info("Transcription complete: %s", text)
     return text
