@@ -45,109 +45,109 @@ os.makedirs(temp_media_dir, exist_ok=True)
 st.caption("Use your voice to describe a topic you want to learn (or a question you’re stuck on). Then JOHN and CARTOON_DAD turn it into a quick, entertaining back-and-forth explanation—complete with brainrot gameplay in the background, captions on screen, and a Shorts-ready video output.")
 # st.caption(f"Session logs saved to `{log_path}`")
 
-# audio = st.audio_input("Upload or record your voice (topic request)")
+audio = st.audio_input("Upload or record your voice (topic request)")
 
-# if audio:
-#     st.write("Audio captured")
-#     st.audio(audio)
-#     logger.info("Audio clip received from user.")
+if audio:
+    st.write("Audio captured")
+    st.audio(audio)
+    logger.info("Audio clip received from user.")
 
-#     os.makedirs(temp_dir, exist_ok=True)
-#     with open(audio_path, "wb") as f:
-#         f.write(audio.getbuffer())
-#     logger.info("Audio saved to %s", audio_path)
+    os.makedirs(temp_dir, exist_ok=True)
+    with open(audio_path, "wb") as f:
+        f.write(audio.getbuffer())
+    logger.info("Audio saved to %s", audio_path)
 
-#     with st.status("Running Duo Mode...", expanded=True) as status:
-#         status.write("Transcribing your topic...")
-#         topic = transcribe_audio(audio_path, logger=logger)
-#         # topic = "decision trees and how they generate branches"
-#         st.write(f"Detected topic: **{topic}**")
-#         logger.info("Detected topic: %s", topic)
+    with st.status("Running Duo Mode...", expanded=True) as status:
+        status.write("Transcribing your topic...")
+        topic = transcribe_audio(audio_path, logger=logger)
+        # topic = "decision trees and how they generate branches"
+        st.write(f"Detected topic: **{topic}**")
+        logger.info("Detected topic: %s", topic)
 
-#         status.update(label="Generating dialogue script...", state="running")
-#         dialogue = generate_dialogue(topic, logger=logger)
-#         status.write("Dialogue ready. Preview it below before synthesis.")
+        status.update(label="Generating dialogue script...", state="running")
+        dialogue = generate_dialogue(topic, logger=logger)
+        status.write("Dialogue ready. Preview it below before synthesis.")
 
-#         st.subheader("Dialogue Script")
-#         for turn in dialogue:
-#             st.markdown(f"**{turn['speaker']}**: {turn['line']}")
+        st.subheader("Dialogue Script")
+        for turn in dialogue:
+            st.markdown(f"**{turn['speaker']}**: {turn['line']}")
 
-#         status.update(label="Synthesizing duo voices...", state="running")
-#         audio_chunks: list[bytes] = []
-#         timed_dialogue: list[dict[str, object]] = []
-#         current_start = 0.0
-#         pause_seconds = max(pause_between_lines_ms, 0) / 1000.0
-#         for idx, turn in enumerate(dialogue, start=1):
-#             speaker_voice = voice_id_for(turn["speaker"])
-#             status.write(f"Generating line {idx} for {turn['speaker']}...")
-#             logger.info("Generating line %s for %s", idx, turn["speaker"])
-#             chunk = speak_text(turn["line"], voice_id=speaker_voice, logger=logger)
-#             audio_chunks.append(chunk)
-#             duration = mp3_duration_seconds(chunk)
-#             timed_dialogue.append(
-#                 {
-#                     "speaker": turn["speaker"],
-#                     "text": turn["line"],
-#                     "start": current_start,
-#                     "duration": duration,
-#                 }
-#             )
-#             logger.info(
-#                 "Line timing speaker=%s duration=%.2fs start=%.2fs",
-#                 turn["speaker"],
-#                 duration,
-#                 current_start,
-#             )
-#             current_start += duration + pause_seconds
+        status.update(label="Synthesizing duo voices...", state="running")
+        audio_chunks: list[bytes] = []
+        timed_dialogue: list[dict[str, object]] = []
+        current_start = 0.0
+        pause_seconds = max(pause_between_lines_ms, 0) / 1000.0
+        for idx, turn in enumerate(dialogue, start=1):
+            speaker_voice = voice_id_for(turn["speaker"])
+            status.write(f"Generating line {idx} for {turn['speaker']}...")
+            logger.info("Generating line %s for %s", idx, turn["speaker"])
+            chunk = speak_text(turn["line"], voice_id=speaker_voice, logger=logger)
+            audio_chunks.append(chunk)
+            duration = mp3_duration_seconds(chunk)
+            timed_dialogue.append(
+                {
+                    "speaker": turn["speaker"],
+                    "text": turn["line"],
+                    "start": current_start,
+                    "duration": duration,
+                }
+            )
+            logger.info(
+                "Line timing speaker=%s duration=%.2fs start=%.2fs",
+                turn["speaker"],
+                duration,
+                current_start,
+            )
+            current_start += duration + pause_seconds
 
-#         final_audio = stitch_mp3_chunks(
-#             audio_chunks,
-#             pause_ms=pause_between_lines_ms,
-#             logger=logger,
-#         )
-#         duo_audio_path = os.path.join(temp_media_dir, "duo_audio.mp3")
-#         with open(duo_audio_path, "wb") as f:
-#             f.write(final_audio)
-#         status.update(label="Duo Mode complete!", state="complete")
-#         logger.info("Dialogue audio stitched successfully.")
-#         st.session_state["timed_dialogue"] = timed_dialogue
-#         st.session_state["duo_audio_path"] = duo_audio_path
+        final_audio = stitch_mp3_chunks(
+            audio_chunks,
+            pause_ms=pause_between_lines_ms,
+            logger=logger,
+        )
+        duo_audio_path = os.path.join(temp_media_dir, "duo_audio.mp3")
+        with open(duo_audio_path, "wb") as f:
+            f.write(final_audio)
+        status.update(label="Duo Mode complete!", state="complete")
+        logger.info("Dialogue audio stitched successfully.")
+        st.session_state["timed_dialogue"] = timed_dialogue
+        st.session_state["duo_audio_path"] = duo_audio_path
 
-#         st.write(timed_dialogue)
-#         st.write(duo_audio_path)
+        # st.write(timed_dialogue)
+        # st.write(duo_audio_path)
 
-#     st.audio(final_audio, format="audio/mp3")
-#     st.download_button(
-#         "Download Duo Dialogue",
-#         data=final_audio,
-#         file_name="duo-mode-dialogue.mp3",
-#         mime="audio/mpeg",
-#     )
+    st.audio(final_audio, format="audio/mp3")
+    st.download_button(
+        "Download Duo Dialogue",
+        data=final_audio,
+        file_name="duo-mode-dialogue.mp3",
+        mime="audio/mpeg",
+    )
 
-if True:
-    st.session_state["timed_dialogue"] = json.loads('''
-[
-  {
-    "speaker": "CARTOON_DAD",
-    "text": "Hey, John, funny thought: if a decision tree were a garden hose, would it tell me to water my cactus today based on sun exposure and soil moisture? And could you sketch a tiny, concrete example tree for that exact scenario?",
-    "start": 0,
-    "duration": 13.740408163265306
-  },
-  {
-    "speaker": "JOHN",
-    "text": "Sure thing. A decision tree is a flow of yes/no questions that splits data into branches until a decision is reached. Start at the root with the plant's features, then ask: is soil moisture low? is sun high? From those answers you reach 'water' or 'do not water'.",
-    "start": 13.990408163265306,
-    "duration": 22.151836734693877
-  },
-  {
-    "speaker": "CARTOON_DAD",
-    "text": "Got it! So decision trees use simple if-then paths to guide choices, with each split using a feature like soil moisture or sun. Thanks for the clear demo, John, now I can read trees as friendly guides.",
-    "start": 36.39224489795918,
-    "duration": 12.016326530612245
-  }
-]
-    ''')
-    st.session_state["duo_audio_path"] = "temp/duo_audio.mp3"
+# if True:
+#     st.session_state["timed_dialogue"] = json.loads('''
+# [
+#   {
+#     "speaker": "CARTOON_DAD",
+#     "text": "Hey, John, funny thought: if a decision tree were a garden hose, would it tell me to water my cactus today based on sun exposure and soil moisture? And could you sketch a tiny, concrete example tree for that exact scenario?",
+#     "start": 0,
+#     "duration": 13.740408163265306
+#   },
+#   {
+#     "speaker": "JOHN",
+#     "text": "Sure thing. A decision tree is a flow of yes/no questions that splits data into branches until a decision is reached. Start at the root with the plant's features, then ask: is soil moisture low? is sun high? From those answers you reach 'water' or 'do not water'.",
+#     "start": 13.990408163265306,
+#     "duration": 22.151836734693877
+#   },
+#   {
+#     "speaker": "CARTOON_DAD",
+#     "text": "Got it! So decision trees use simple if-then paths to guide choices, with each split using a feature like soil moisture or sun. Thanks for the clear demo, John, now I can read trees as friendly guides.",
+#     "start": 36.39224489795918,
+#     "duration": 12.016326530612245
+#   }
+# ]
+#     ''')
+#     st.session_state["duo_audio_path"] = "temp/duo_audio_decision_tree.mp3"
 
     brainrot_files = []
     if os.path.isdir(brainrot_dir):
