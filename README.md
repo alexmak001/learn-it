@@ -2,8 +2,9 @@
 
 This Streamlit app turns a short topic into a Duo Mode dialogue (CARTOON_DAD + JOHN), generates TTS audio per line, and renders a vertical Shorts-style video with animated captions and character overlays.
 
+<p align="center">
 <img src="pics/shortform_studio_example.png" alt="Shortform example" width="30%">
-
+</p>
 ## How It Works
 
 1. **Dialogue**: `backend/ai_service.py` produces a 3-turn JSON dialogue (Dad, John, Dad).
