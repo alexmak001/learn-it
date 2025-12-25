@@ -3,7 +3,7 @@
 This Streamlit app turns a short topic into a Duo Mode dialogue (CARTOON_DAD + JOHN), generates TTS audio per line, and renders a vertical Shorts-style video with animated captions and character overlays.
 
 <p align="center">
-<img src="pics/examlple_vid.gif" alt="Shortform example" width="30%">
+<img src="pics/example_vid.gif" alt="Shortform example" width="30%">
 </p>
 
 ## How It Works
