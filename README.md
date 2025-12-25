@@ -5,6 +5,7 @@ This Streamlit app turns a short topic into a Duo Mode dialogue (CARTOON_DAD + J
 <p align="center">
 <img src="pics/examlple_vid.gif" alt="Shortform example" width="30%">
 </p>
+
 ## How It Works
 
 1. **Dialogue**: `backend/ai_service.py` produces a 3-turn JSON dialogue (Dad, John, Dad).
